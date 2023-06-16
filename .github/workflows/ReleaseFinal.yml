@@ -1,0 +1,59 @@
+name: ReselaseFinal
+on:
+  push:
+    branches: 
+      - 'develop'
+jobs:
+  job1:
+    name: Fase_I
+    runs-on: ubuntu-latest
+    if: ${{ contains(github.event.head_commit.message, 'ReleaseFinal') }}
+    steps:
+    - name: Checkout latest code
+      uses: actions/checkout@v2
+
+    - name: Configuración de entorno de python
+      uses: actions/setup-python@v2
+      with:
+          python-version: '3.8'
+          
+    - name: Instalación de librerías y dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Crear rama release
+      run: |
+        git checkout -b release
+        git push -f -u origin release      
+
+    - name: Merge Develop -> Release
+      uses: tukasz/direct-merge-action@master
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        source-branch: develop
+        target-branch: release
+
+    - name: Correr Pruebas
+      id: correr-pruebas
+      run: python -m unittest discover -s tests
+
+    - name: Cálculo de cubrimiento
+      id: cubrimiento
+      run: |
+          coverage run -m unittest discover -s tests
+          coverage report -m
+
+    - name: Validar resultado con errores
+      if: ${{ failure() }}
+      env:
+        MENSAJE_ERROR: Una o varias pruebas fallaron
+      run: echo "::set-output name=respuesta::${MENSAJE_ERROR}"
+      
+    - name: Validar resultado sin errores - Merge Release -> Main
+      if: ${{ success() }}      
+      uses: tukasz/direct-merge-action@master
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        source-branch: release
+        target-branch: main

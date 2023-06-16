@@ -1,0 +1,58 @@
+name: Automerge_HU010
+on:
+  push:
+    branches: 
+      - 'feature/HU010'
+jobs:
+  job1:
+    name: automerge_hu010
+    runs-on: ubuntu-latest
+    #if: "!contains(github.event.head_commit.message, 'ci skip')"
+    if: ${{ contains(github.event.head_commit.message, 'HU010') }}
+    steps:
+    - name: Checkout latest code
+      uses: actions/checkout@v2
+
+    - name: Configuración de entorno de python
+      uses: actions/setup-python@v2
+      with:
+          python-version: '3.8'
+          
+    - name: Instalación de librerías y dependencias
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      
+    - name: Merge Develop -> Rama Funcionalidad
+      uses: tukasz/direct-merge-action@master
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        source-branch: develop
+        target-branch: feature/HU010
+
+    - name: Correr Pruebas
+      id: correr-pruebas
+      run: python -m unittest discover -s tests
+      
+    - name: Cálculo de cubrimiento
+      id: cubrimiento
+      run: |
+          coverage run -m unittest tests/test_carrera.py
+          coverage report -m
+
+    - name: Validar resultado con errores
+      if: ${{ failure() }}
+      env:
+        MENSAJE_ERROR: Una o varias pruebas fallaron
+      run: echo "::set-output name=respuesta::${MENSAJE_ERROR}"
+      
+    - name: Validar resultado sin errores
+      if: ${{ success() }}      
+      #env:
+      #  MENSAJE_EXITO: Todas las pruebas fueron exitosas
+      #run: echo "::set-output name=respuesta::${MENSAJE_EXITO}"
+      uses: tukasz/direct-merge-action@master
+      with:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        source-branch: feature/HU010
+        target-branch: develop
